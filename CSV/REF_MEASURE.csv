@@ -1,0 +1,12 @@
+ID,CODE,NAME_EN,NAME_FR,NAME_ES,NAME_AR,NAME_ZH,NAME_RU,UNIT,UNIT_MULTIPLIER,SHORT_NAME
+00000001,Q_t_1,Tonnes,Tonnes,Toneladas,"","","",t,1,Tonnes
+00000002,V_USD_1000,Value (USD 1000),Valeur (1000 USD),Valor (1000 USD),"","","",(1000 USD),1000,USD (1000)
+00000003,Q_no_1,Number,Nombre,Número,"","","",no,1,Number
+00000004,E_h_1,Effort (hours),Effort (heures),Esfuerzo (horas),"","","",h,1,Effort (hrs)
+00000005,Q_kg_1,Quantity (kilograms),Quantité (kilogrammes),Cantidad (kilogramos),"","","",kg,1,Quantity (kg)
+00000006,L_m_1,Length (meters),Longeur (mètres),Eslora (metros),"","","",m,1,Length (m)
+00000007,Q_no_1000,Number (Thousand),Nombre (Mille),Número (Mil),"","","",no,1000,Number (1000)
+00000008,Q_kw_1,Kilowatt,Kilowatt,Kilovatio,"","","",kw,1,Quantity (kW)
+00000009,Q_tlw,Tonnes - live weight,Tonnes - poids vif,Toneladas - peso vivo,"","","",t,1,TLW
+00000010,Q_tpw,Tonnes – net product weight,Tonnes – poids produit net,Toneladas – peso producto neto,"","","",t,1,TPW
+00000011,V_LCU,Local currency unit,Unité monétaire locale,Unidad de moneda local,"","","",LCU,1,Local Currency
