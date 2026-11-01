@@ -39,8 +39,12 @@ ORDER BY 1
 
 -- @QUERY t2_species_quantity
 -- Таблица 2. Производство объектов аквакультуры, тонн.
--- Колонки: вид (NAME_EN), 2020..2024.
-SELECT COALESCE(s.NAME_EN, 'Unknown') AS SPECIES_NAME,
+-- Колонки: вид (NAME_EN; при пустом — [SCIENTIFIC_NAME]), 2020..2024.
+SELECT CASE WHEN s.ID IS NULL THEN 'Unknown'
+              WHEN COALESCE(NULLIF(TRIM(s.NAME_EN), ''), '') <> '' THEN s.NAME_EN
+              WHEN COALESCE(NULLIF(TRIM(s.SCIENTIFIC_NAME), ''), '') <> ''
+                   THEN '[' || TRIM(s.SCIENTIFIC_NAME) || ']'
+              ELSE 'Unknown' END AS SPECIES_NAME,
        SUM(COALESCE(t.VALUE_Y2020, 0)) AS Y2020,
        SUM(COALESCE(t.VALUE_Y2021, 0)) AS Y2021,
        SUM(COALESCE(t.VALUE_Y2022, 0)) AS Y2022,
@@ -50,7 +54,7 @@ FROM FISHSTAT.TSD_AQUACULTURE_QUANTITY t
 LEFT JOIN FISHSTAT.REF_SPECIES s ON s.ALPHA_3_CODE = t.SPECIES
 WHERE NOT EXISTS (SELECT 1 FROM FISHSTAT.REL_YEARBOOK_GROUP_SPECIES r
                   WHERE r.PARENT_ID = '00000004' AND r.CHILD_ID = s.ID)
-GROUP BY COALESCE(s.NAME_EN, 'Unknown')
+GROUP BY CASE WHEN s.ID IS NULL THEN 'Unknown' WHEN COALESCE(NULLIF(TRIM(s.NAME_EN), ''), '') <> '' THEN s.NAME_EN WHEN COALESCE(NULLIF(TRIM(s.SCIENTIFIC_NAME), ''), '') <> '' THEN '[' || TRIM(s.SCIENTIFIC_NAME) || ']' ELSE 'Unknown' END
 ORDER BY 1
 
 -- @QUERY t3_world_group_env_quantity
@@ -188,7 +192,11 @@ ORDER BY 1, 3
 -- @QUERY t7_country_species
 -- Таблица 7. Производство по странам и видам, тонн.
 SELECT COALESCE(c.NAME_EN, 'Unknown') AS COUNTRY_NAME,
-       COALESCE(s.NAME_EN, 'Unknown') AS SPECIES_NAME,
+       CASE WHEN s.ID IS NULL THEN 'Unknown'
+              WHEN COALESCE(NULLIF(TRIM(s.NAME_EN), ''), '') <> '' THEN s.NAME_EN
+              WHEN COALESCE(NULLIF(TRIM(s.SCIENTIFIC_NAME), ''), '') <> ''
+                   THEN '[' || TRIM(s.SCIENTIFIC_NAME) || ']'
+              ELSE 'Unknown' END AS SPECIES_NAME,
        SUM(COALESCE(t.VALUE_Y2020, 0)) AS Y2020,
        SUM(COALESCE(t.VALUE_Y2021, 0)) AS Y2021,
        SUM(COALESCE(t.VALUE_Y2022, 0)) AS Y2022,
@@ -199,7 +207,7 @@ LEFT JOIN FISHSTAT.REF_COUNTRY c ON c.UN_CODE = t.COUNTRY
 LEFT JOIN FISHSTAT.REF_SPECIES s ON s.ALPHA_3_CODE = t.SPECIES
 WHERE NOT EXISTS (SELECT 1 FROM FISHSTAT.REL_YEARBOOK_GROUP_SPECIES y
                   WHERE y.PARENT_ID = '00000004' AND y.CHILD_ID = s.ID)
-GROUP BY COALESCE(c.NAME_EN, 'Unknown'), COALESCE(s.NAME_EN, 'Unknown')
+GROUP BY COALESCE(c.NAME_EN, 'Unknown'), CASE WHEN s.ID IS NULL THEN 'Unknown' WHEN COALESCE(NULLIF(TRIM(s.NAME_EN), ''), '') <> '' THEN s.NAME_EN WHEN COALESCE(NULLIF(TRIM(s.SCIENTIFIC_NAME), ''), '') <> '' THEN '[' || TRIM(s.SCIENTIFIC_NAME) || ']' ELSE 'Unknown' END
 ORDER BY 1, 2
 
 -- @QUERY t8_species_environment
@@ -207,7 +215,11 @@ ORDER BY 1, 2
 -- Колонки: группа ISSCAAP, номер группы, вид, среда (ALPHA_2_CODE), 2020..2024.
 SELECT ig.NAME_EN AS GROUP_NAME,
        (((ig.CODE - ig.CODE / 10 * 10) + 10 * ((ig.CODE - ig.CODE / 100 * 100) / 10))) AS GROUP_CODE,
-       COALESCE(s.NAME_EN, 'Unknown') AS SPECIES_NAME,
+       CASE WHEN s.ID IS NULL THEN 'Unknown'
+              WHEN COALESCE(NULLIF(TRIM(s.NAME_EN), ''), '') <> '' THEN s.NAME_EN
+              WHEN COALESCE(NULLIF(TRIM(s.SCIENTIFIC_NAME), ''), '') <> ''
+                   THEN '[' || TRIM(s.SCIENTIFIC_NAME) || ']'
+              ELSE 'Unknown' END AS SPECIES_NAME,
        t.ENVIRONMENT AS ENV_CODE,
        SUM(COALESCE(t.VALUE_Y2020, 0)) AS Y2020,
        SUM(COALESCE(t.VALUE_Y2021, 0)) AS Y2021,
@@ -220,7 +232,7 @@ JOIN FISHSTAT.REL_ISSCAAP_GROUP_SPECIES r ON r.CHILD_ID = s.ID
 JOIN FISHSTAT.REF_ISSCAAP_GROUP ig ON ig.ID = r.PARENT_ID
 WHERE NOT EXISTS (SELECT 1 FROM FISHSTAT.REL_YEARBOOK_GROUP_SPECIES y
                   WHERE y.PARENT_ID = '00000004' AND y.CHILD_ID = s.ID)
-GROUP BY ig.NAME_EN, (((ig.CODE - ig.CODE / 10 * 10) + 10 * ((ig.CODE - ig.CODE / 100 * 100) / 10))), COALESCE(s.NAME_EN, 'Unknown'),
+GROUP BY ig.NAME_EN, (((ig.CODE - ig.CODE / 10 * 10) + 10 * ((ig.CODE - ig.CODE / 100 * 100) / 10))), CASE WHEN s.ID IS NULL THEN 'Unknown' WHEN COALESCE(NULLIF(TRIM(s.NAME_EN), ''), '') <> '' THEN s.NAME_EN WHEN COALESCE(NULLIF(TRIM(s.SCIENTIFIC_NAME), ''), '') <> '' THEN '[' || TRIM(s.SCIENTIFIC_NAME) || ']' ELSE 'Unknown' END,
          t.ENVIRONMENT, ig.ID, s.ID
 ORDER BY 2, 3, 4
 
@@ -228,7 +240,11 @@ ORDER BY 2, 3, 4
 -- Таблица 9. Видовой состав мирового производства, тонн.
 SELECT ig.NAME_EN AS GROUP_NAME,
        (((ig.CODE - ig.CODE / 10 * 10) + 10 * ((ig.CODE - ig.CODE / 100 * 100) / 10))) AS GROUP_CODE,
-       COALESCE(s.NAME_EN, 'Unknown') AS SPECIES_NAME,
+       CASE WHEN s.ID IS NULL THEN 'Unknown'
+              WHEN COALESCE(NULLIF(TRIM(s.NAME_EN), ''), '') <> '' THEN s.NAME_EN
+              WHEN COALESCE(NULLIF(TRIM(s.SCIENTIFIC_NAME), ''), '') <> ''
+                   THEN '[' || TRIM(s.SCIENTIFIC_NAME) || ']'
+              ELSE 'Unknown' END AS SPECIES_NAME,
        SUM(COALESCE(t.VALUE_Y2020, 0)) AS Y2020,
        SUM(COALESCE(t.VALUE_Y2021, 0)) AS Y2021,
        SUM(COALESCE(t.VALUE_Y2022, 0)) AS Y2022,
@@ -240,5 +256,5 @@ JOIN FISHSTAT.REL_ISSCAAP_GROUP_SPECIES r ON r.CHILD_ID = s.ID
 JOIN FISHSTAT.REF_ISSCAAP_GROUP ig ON ig.ID = r.PARENT_ID
 WHERE NOT EXISTS (SELECT 1 FROM FISHSTAT.REL_YEARBOOK_GROUP_SPECIES y
                   WHERE y.PARENT_ID = '00000004' AND y.CHILD_ID = s.ID)
-GROUP BY ig.NAME_EN, (((ig.CODE - ig.CODE / 10 * 10) + 10 * ((ig.CODE - ig.CODE / 100 * 100) / 10))), COALESCE(s.NAME_EN, 'Unknown'), ig.ID, s.ID
+GROUP BY ig.NAME_EN, (((ig.CODE - ig.CODE / 10 * 10) + 10 * ((ig.CODE - ig.CODE / 100 * 100) / 10))), CASE WHEN s.ID IS NULL THEN 'Unknown' WHEN COALESCE(NULLIF(TRIM(s.NAME_EN), ''), '') <> '' THEN s.NAME_EN WHEN COALESCE(NULLIF(TRIM(s.SCIENTIFIC_NAME), ''), '') <> '' THEN '[' || TRIM(s.SCIENTIFIC_NAME) || ']' ELSE 'Unknown' END, ig.ID, s.ID
 ORDER BY 2, 3
