@@ -1,0 +1,53 @@
+OpenBLAS WARNING - could not determine the L2 cache size on this system, assuming 256k
+----------------------------------------------------------------
+Sun Nov 01 04:07:12 UTC 2026:
+Booting Derby version The Apache Software Foundation - Apache Derby - 10.14.2.0 - (1828579): instance a816c00e-01a1-954a-38be-0000018bdf60 
+on database directory /workspace/derbydb with class loader jdk.internal.loader.ClassLoaders$AppClassLoader@30946e09 
+Loaded from file:/workspace/lib/derby.jar
+java.vendor=Debian
+java.runtime.version=17.0.20+8-1-deb12u1-Debian
+user.dir=/workspace
+os.name=Linux
+os.arch=amd64
+os.version=4.19.91-c8dfc93.al7.x86_64
+derby.system.home=null
+derby.stream.error.field=java.lang.System.out
+Database Class Loader started - derby.database.classpath=''
+----------------------------------------------------------------
+Sun Nov 01 04:07:39 UTC 2026: Shutting down Derby engine
+----------------------------------------------------------------
+Sun Nov 01 04:07:39 UTC 2026:
+Shutting down instance a816c00e-01a1-954a-38be-0000018bdf60 on database directory /workspace/derbydb with class loader jdk.internal.loader.ClassLoaders$AppClassLoader@30946e09 
+----------------------------------------------------------------
+Запуск JVM и Derby embedded...
+Создание схемы FISHSTAT...
+Выполнение DDL (26 операторов)...
+Загрузка CSV...
+  REF_AREA                         28 строк
+  REF_COUNTRY                     248 строк
+  REF_ENVIRONMENT                   3 строк
+  REF_INLAND_MARINE                 2 строк
+  REF_ISSCAAP_GROUP                50 строк
+  REF_MEASURE                      11 строк
+  REF_SPECIES                    4065 строк
+  REF_YEARBOOK_GROUP                4 строк
+  REL_INLAND_MARINE_AREA           28 строк
+  REL_ISSCAAP_GROUP_SPECIES      4065 строк
+  REL_YEARBOOK_GROUP_SPECIES     4065 строк
+  TSD_AQUACULTURE_QUANTITY       4134 строк
+  TSD_AQUACULTURE_VALUE          4134 строк
+Выполнение SQL-запросов из sql_queries.sql...
+  t1_countries_quantity           220 строк
+  t2_species_quantity             715 строк
+  t3_world_group_env_quantity       4 строк
+  t3_world_group_env_value          4 строк
+  t4_countries_k                  220 строк
+  t4_countries_s                  220 строк
+  t5_isscaap_k                     39 строк
+  t5_isscaap_s                     39 строк
+  t6_country_isscaap             1569 строк
+  t7_country_species             3567 строк
+  t8_species_environment          980 строк
+  t9_world_species                765 строк
+Запись /workspace/aquaculture_report.xlsx ...
+Готово: /workspace/aquaculture_report.xlsx
