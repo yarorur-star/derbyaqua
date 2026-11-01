@@ -13,8 +13,9 @@ derbyaqua: формирование Excel-файла с итоговыми та�
   4. пост-обработка результатов (заголовки, строки "ВСЕГО", удаление нулевых
      строк, группировка) и запись результата в Excel (лист = таблица).
 
-Требования: Java (JDK/JRE), pip install jaydebeapi pandas openpyxl,
-jar-файлы Apache Derby в ./lib (скачиваются автоматически при первом запуске).
+Требования: Java 21+ (Derby 10.17 compiled for JDK 21), Python 3,
+pip install jpype1 pandas openpyxl, jar-файлы Apache Derby в ./lib
+(скачиваются автоматически при первом запуске).
 
 Запуск:  python3 build_excel.py [-o result.xlsx] [--years 2020 2021 2022 2023 2024]
 """
@@ -37,8 +38,12 @@ DDL_FILE = os.path.join(BASE_DIR, "aqua_ddl.sql")
 DB_DIR = os.path.join(BASE_DIR, "derbydb")
 LIB_DIR = os.path.join(BASE_DIR, "lib")
 
-DERBY_VERSION = "10.14.2.0"
+DERBY_VERSION = "10.17.1.0"
 DERBY_JARS = ["derby", "derbyshared", "derbytools"]
+# В Derby 10.16+ класс org.apache.derby.jdbc.EmbeddedDriver удалён из
+# открытого API (DERBY-... / modularization); официальный драйвер —
+# org.apache.derby.iapi.jdbc.AutoloadedDriver (META-INF/services/java.sql.Driver).
+DERBY_DRIVER = "org.apache.derby.iapi.jdbc.AutoloadedDriver"
 MAVEN_URL = ("https://repo1.maven.org/maven2/org/apache/derby/{jar}/{ver}/{jar}-{ver}.jar")
 
 SCHEMA = "FISHSTAT"
@@ -59,6 +64,69 @@ def value_col(year):
 # ---------------------------------------------------------------------------
 # Подготовка окружения Derby
 # ---------------------------------------------------------------------------
+def _find_jvm21():
+    """Возвращает путь к libjvm.so Java 21+ (требование Derby 10.17).
+
+    Ищем: JAVA_HOME, /opt/jdk21, стандартные каталоги JVM; если найденная
+    версия ниже 21 — пробуем скачать Temurin JRE 21 в ./lib/jdk21.
+    """
+    def jvm_path(home):
+        for rel in ("lib/server/libjvm.so", "lib/amd64/server/libjvm.so"):
+            p = os.path.join(home, rel)
+            if os.path.exists(p):
+                return p
+        return None
+
+    def java_version(home):
+        exe = os.path.join(home, "bin", "java")
+        if not os.path.exists(exe):
+            return 0
+        try:
+            out = subprocess.run([exe, "-version"], capture_output=True,
+                                 text=True).stderr
+            m = re.search(r'version "(\d+)', out)
+            return int(m.group(1)) if m else 0
+        except Exception:
+            return 0
+
+    candidates = []
+    if os.environ.get("JAVA_HOME"):
+        candidates.append(os.environ["JAVA_HOME"])
+    candidates.append("/opt/jdk21")
+    if os.path.isdir("/usr/lib/jvm"):
+        candidates += [os.path.join("/usr/lib/jvm", d)
+                       for d in sorted(os.listdir("/usr/lib/jvm"), reverse=True)]
+    local = os.path.join(LIB_DIR, "jdk21")
+    candidates.append(local)
+
+    for home in candidates:
+        p = jvm_path(home)
+        if p and java_version(home) >= 21:
+            return p
+
+    # скачиваем Temurin JRE 21
+    print("Java 21 не найдена — скачивание Temurin JRE 21 в %s ..." % local)
+    url = ("https://api.adoptium.net/v3/binary/latest/21/ga/linux/x64/"
+           "jre/hotspot/normal/eclipse")
+    tmp_tar = os.path.join(LIB_DIR, "jdk21.tar.gz")
+    urllib.request.urlretrieve(url, tmp_tar)
+    import tarfile
+    with tarfile.open(tmp_tar) as tf:
+        names = [m.name.split("/")[0] for m in tf.getmembers() if m.name]
+        root = sorted(set(names))[0]
+        tf.extractall(LIB_DIR, members=[m for m in tf.getmembers()
+                                        if m.name.startswith(root)])
+    extracted = os.path.join(LIB_DIR, root)
+    if os.path.exists(local):
+        shutil.rmtree(local)
+    os.rename(extracted, local)
+    os.remove(tmp_tar)
+    p = jvm_path(local)
+    if not p:
+        raise SystemExit("Не удалось подготовить JVM 21")
+    return p
+
+
 def ensure_jars():
     """Проверяем наличие jar Apache Derby в ./lib, при отсутствии скачиваем."""
     missing = []
@@ -82,16 +150,183 @@ def classpath():
     )
 
 
-def get_connection(create_db):
-    """Подключение к embedded Derby через JDBC (jaydebeapi)."""
-    import jaydebeapi
+# ---------------------------------------------------------------------------
+# Тонкая прослойка JDBC поверх JPype (эмуляция DB-API 2.0, как jaydebeapi).
+# Требуется для Derby 10.17: в этой версии удалён публичный класс
+# org.apache.derby.jdbc.EmbeddedDriver, а сам jar скомпилирован под Java 21;
+# jaydebeapi не позволяет явно указать JVM, поэтому поднимаем JVM 21 через
+# jpype и регистрируем драйвер AutoloadedDriver вручную.
+# ---------------------------------------------------------------------------
+class _JdbcCursor(object):
+    def __init__(self, conn):
+        self._conn = conn
+        self._stmt = None
+        self._rs = None
+        self.description = None
+        self.rowcount = -1
 
+    def execute(self, sql, params=None):
+        self.close()
+        if params is None:
+            st = self._conn.jconn.createStatement()
+            has_rs = st.execute(sql)
+            self._stmt = st
+        else:
+            ps = self._conn.jconn.prepareStatement(sql)
+            for i, v in enumerate(params, start=1):
+                if v is None:
+                    ps.setNull(i, java_sql_types["VARCHAR"])
+                elif isinstance(v, float):
+                    ps.setDouble(i, v)
+                elif isinstance(v, int):
+                    ps.setLong(i, v)
+                else:
+                    ps.setString(i, str(v))
+            has_rs = ps.execute()
+            self._stmt = ps
+        if has_rs:
+            self._rs = self._stmt.getResultSet()
+            md = self._rs.getMetaData()
+            self.description = [(str(md.getColumnName(i)), None, None,
+                                 md.getColumnCount(), None, None, True)
+                                for i in range(1, md.getColumnCount() + 1)]
+        return None
+
+    def executemany(self, sql, seq_of_params):
+        for p in seq_of_params:
+            self.execute(sql, p)
+
+    def fetchall(self):
+        if self._rs is None:
+            return []
+        ncols = len(self.description)
+        out = []
+        while self._rs.next():
+            row = []
+            for i in range(1, ncols + 1):
+                v = self._rs.getObject(i)
+                if v is None:
+                    row.append(None)
+                else:
+                    # приводим java-числа/строки к python-типам
+                    try:
+                        row.append(int(v) if _is_java_int(v) else
+                                   float(v) if _is_java_num(v) else
+                                   str(v))
+                    except Exception:
+                        row.append(str(v))
+            out.append(tuple(row))
+        return out
+
+    def fetchone(self):
+        rows = self.fetchall()
+        return rows[0] if rows else None
+
+    def close(self):
+        for a in ("_rs", "_stmt"):
+            obj = getattr(self, a)
+            setattr(self, a, None)
+            if obj is not None:
+                try:
+                    obj.close()
+                except Exception:
+                    pass
+        self.description = None
+
+
+def _java_class_name(v):
+    try:
+        return str(jpype.classOf(v).getName())
+    except Exception:
+        return type(v).__name__
+
+
+def _is_java_int(v):
+    n = _java_class_name(v)
+    return n in ("java.lang.Integer", "java.lang.Long", "java.lang.Short",
+                 "java.math.BigInteger")
+
+
+def _is_java_num(v):
+    n = _java_class_name(v)
+    if n in ("java.lang.Double", "java.lang.Float", "java.math.BigDecimal"):
+        return True
+    try:
+        Number = jpype.JClass("java.lang.Number")
+        return isinstance(v, Number)
+    except Exception:
+        return False
+
+
+class _JdbcConnection(object):
+    def __init__(self, jconn):
+        self.jconn = jconn
+
+    def cursor(self):
+        return _JdbcCursor(self)
+
+    def commit(self):
+        self.jconn.commit()
+
+    def rollback(self):
+        self.jconn.rollback()
+
+    def close(self):
+        try:
+            self.jconn.close()
+        except Exception:
+            pass
+
+
+JP_JVM_STARTED = [False]
+java_sql_types = {"VARCHAR": 12}
+
+
+def _start_jvm():
+    """Однократный запуск JVM 21 с classpath из jar Derby."""
+    if JP_JVM_STARTED[0]:
+        return
+    import jpype
+    globals()["jpype"] = jpype
+    jvm = _find_jvm21()
+    print("Используется JVM: %s" % jvm)
+    if jpype.isJVMStarted():
+        jpype.shutdownJVM()
+    jpype.startJVM(jvm, "-Djava.awt.headless=true",
+                   classpath=[os.path.abspath(p) for p in classpath().split(os.pathsep)])
+    # явная регистрация драйвера (AutoloadedDriver в 10.16+, EmbeddedDriver ранее)
+    drv_class = DERBY_DRIVER
+    try:
+        jpype.JClass(drv_class)
+    except TypeError:
+        drv_class = "org.apache.derby.jdbc.EmbeddedDriver"
+        jpype.JClass(drv_class)
+    DriverManager = jpype.JClass("java.sql.DriverManager")
+    globals()["DriverManager"] = DriverManager
+    DriverManager.registerDriver(jpype.JClass(drv_class)())
+    JP_JVM_STARTED[0] = True
+
+
+def get_connection(create_db):
+    """Подключение к embedded Derby через JDBC (JPype + JVM 21)."""
+    _start_jvm()
     url = "jdbc:derby:%s;user=%s;password=%s;%s" % (
         DB_DIR, SCHEMA, SCHEMA,
         "create=true" if create_db else "create=false")
-    conn = jaydebeapi.connect(
-        "org.apache.derby.jdbc.EmbeddedDriver", url, classpath())
-    return conn
+    jconn = DriverManager.getConnection(url)
+    return _JdbcConnection(jconn)
+
+
+def shutdown_derby():
+    """Корректная остановка движка embedded Derby (бросает 01Y01 — штатно)."""
+    if not JP_JVM_STARTED[0]:
+        return
+    try:
+        DriverManager.getConnection("jdbc:derby:;shutdown=true")
+    except Exception as e:
+        msg = str(e)
+        if "Derby system shutdown" not in msg and "XJ015" not in msg:
+            print("Предупреждение при остановке Derby:", msg[:200])
 
 
 def drop_schema(conn):
@@ -149,7 +384,9 @@ def load_csv_to_table(conn, table):
     rs = conn.jconn.getMetaData().getColumns(None, SCHEMA, table, None)
     coltypes = {}
     while rs.next():
-        coltypes[rs.getString(4).upper()] = TYPE_CODES.get(rs.getInt(6), "str")
+        # в getColumns: 4=COLUMN_NAME, 5=DATA_TYPE (в Derby 10.17 значения
+        # возвращаются как строки, поэтому приводим через int())
+        coltypes[rs.getString(4).upper()] = TYPE_CODES.get(int(rs.getObject(5)), "str")
     rs.close()
     cols = list(df.columns)
     stmt = "INSERT INTO %s.%s (%s) VALUES (%s)" % (
@@ -683,6 +920,7 @@ def main():
             conn.close()
         except Exception:
             pass
+        shutdown_derby()
 
 
 if __name__ == "__main__":
