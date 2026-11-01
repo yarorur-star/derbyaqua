@@ -1,7 +1,7 @@
 OpenBLAS WARNING - could not determine the L2 cache size on this system, assuming 256k
 ----------------------------------------------------------------
-Sun Nov 01 05:05:49 UTC 2026:
-Booting Derby version The Apache Software Foundation - Apache Derby - 10.14.2.0 - (1828579): instance a816c00e-01a1-957f-e54f-0000018e5200 
+Sun Nov 01 05:45:25 UTC 2026:
+Booting Derby version The Apache Software Foundation - Apache Derby - 10.14.2.0 - (1828579): instance a816c00e-01a1-95a4-26e3-00000190dbc8 
 on database directory /workspace/derbydb with class loader jdk.internal.loader.ClassLoaders$AppClassLoader@30946e09 
 Loaded from file:/workspace/lib/derby.jar
 java.vendor=Debian
@@ -14,10 +14,10 @@ derby.system.home=null
 derby.stream.error.field=java.lang.System.out
 Database Class Loader started - derby.database.classpath=''
 ----------------------------------------------------------------
-Sun Nov 01 05:06:18 UTC 2026: Shutting down Derby engine
+Sun Nov 01 05:45:55 UTC 2026: Shutting down Derby engine
 ----------------------------------------------------------------
-Sun Nov 01 05:06:18 UTC 2026:
-Shutting down instance a816c00e-01a1-957f-e54f-0000018e5200 on database directory /workspace/derbydb with class loader jdk.internal.loader.ClassLoaders$AppClassLoader@30946e09 
+Sun Nov 01 05:45:55 UTC 2026:
+Shutting down instance a816c00e-01a1-95a4-26e3-00000190dbc8 on database directory /workspace/derbydb with class loader jdk.internal.loader.ClassLoaders$AppClassLoader@30946e09 
 ----------------------------------------------------------------
 Запуск JVM и Derby embedded...
 Создание схемы FISHSTAT...
@@ -38,7 +38,7 @@ Shutting down instance a816c00e-01a1-957f-e54f-0000018e5200 on database director
   TSD_AQUACULTURE_VALUE          4134 строк
 Выполнение SQL-запросов из sql_queries.sql...
   t1_countries_quantity           220 строк
-  t2_species_quantity             715 строк
+  t2_species_quantity             765 строк
   t3_world_group_env_quantity       4 строк
   t3_world_group_env_value          4 строк
   t4_countries_k                  220 строк
@@ -46,7 +46,7 @@ Shutting down instance a816c00e-01a1-957f-e54f-0000018e5200 on database director
   t5_isscaap_k                     39 строк
   t5_isscaap_s                     39 строк
   t6_country_isscaap             1569 строк
-  t7_country_species             3567 строк
+  t7_country_species             3604 строк
   t8_species_environment          980 строк
   t9_world_species                765 строк
 Запись /workspace/aquaculture_report.xlsx ...

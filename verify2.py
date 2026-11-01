@@ -30,7 +30,20 @@ excl = set(yg[yg.PARENT_ID == "00000004"].CHILD_ID)
 g2 = set(yg[yg.PARENT_ID == "00000002"].CHILD_ID)
 g3 = set(yg[yg.PARENT_ID == "00000003"].CHILD_ID)
 sid = sp.drop_duplicates("ALPHA_3_CODE").set_index("ALPHA_3_CODE").ID
-sname = sp.drop_duplicates("ALPHA_3_CODE").set_index("ALPHA_3_CODE").NAME_EN
+_spd = sp.drop_duplicates("ALPHA_3_CODE").set_index("ALPHA_3_CODE")
+
+def _species_name(name_en, sci):
+    """Аналог SQL-CASE: NAME_EN, при пустом — [SCIENTIFIC_NAME], иначе Unknown."""
+    if isinstance(name_en, str) and name_en.strip():
+        return name_en
+    if isinstance(sci, str) and sci.strip():
+        return "[" + sci.strip() + "]"
+    return "Unknown"
+
+sname = pd.Series(
+    [_species_name(ne, sc) for ne, sc in zip(_spd.NAME_EN, _spd.SCIENTIFIC_NAME)],
+    index=_spd.index,
+)
 cname = ctry.set_index("UN_CODE").NAME_EN
 a_by_code = area.set_index("CODE").ID
 p_by_child = rel_ima.drop_duplicates("CHILD_ID").set_index("CHILD_ID").PARENT_ID
