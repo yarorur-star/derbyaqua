@@ -298,70 +298,53 @@ def sheet_table2(rows):
 WATERS_ORDER = ["Marine areas", "Inland waters"]
 
 
-def _t3_totals(qrows, vrows):
-    """Собирает блоки ВСЕГО/в том числе из строк [gid,gname,wname,y1..y5]."""
-    def agg(rows, pred):
-        res = [0.0] * 5
-        for r in rows:
-            if pred(r):
-                for i in range(5):
-                    res[i] += fmt_num(r[3 + i])
-        return [round2(x) for x in res]
-
-    blocks = []
-    specs = [
-        ("ВСЕГО (сумма ID 00000002 и ID 00000003 REF_YEARBOOK_GROUP)",
-         lambda r: True),
-        ("в том числе:", None),
-        ("     Морские районы", lambda r: r[2] == "Marine areas"),
-        ("     Внутренние районы", lambda r: r[2] == "Inland waters"),
-        ("РЫБА И БЕСПОЗВОНОЧНЫЕ (группа ID 00000002 REF_YEARBOOK_GROUP)",
-         lambda r: r[0] == "00000002"),
-        ("в том числе:", None),
-        ("     Морские районы", lambda r: r[0] == "00000002" and r[2] == "Marine areas"),
-        ("     Внутренние районы", lambda r: r[0] == "00000002" and r[2] == "Inland waters"),
-        ("ВОДОРОСЛИ (группа ID 00000003 REF_YEARBOOK_GROUP)",
-         lambda r: r[0] == "00000003"),
-        ("в том числе:", None),
-        ("     Морские районы", lambda r: r[0] == "00000003" and r[2] == "Marine areas"),
-        ("     Внутренние районы", lambda r: r[0] == "00000003" and r[2] == "Inland waters"),
-    ]
-    for label, pred in specs:
-        if pred is None:
-            blocks.append([label, "", "", None, None, None, None, None])
-        else:
-            blocks.append([label, "К", "", *agg(qrows, pred)])
-            blocks.append([label if pred is not None else "", "С", "",
-                           *agg(vrows, pred)])
-    # для строк "в том числе:" значения не нужны — уже пустые
-    return blocks
+# Русские подписи вод по REF_INLAND_MARINE.NAME_RU (как в README задания)
+WATERS_LABELS = [("Marine areas", "Морские районы"),
+                 ("Inland waters", "Внутренние районы")]
 
 
-def _t3_group_rows(rows_q, rows_v, gid):
-    out = []
-    sub = [r for r in rows_q if r[0] == gid]
-    subv = [r for r in rows_v if r[0] == gid]
-    gname = sub[0][1] if sub else (subv[0][1] if subv else gid)
-    tot_q = [round2(sum(fmt_num(r[3 + i]) for r in sub)) for i in range(5)]
-    tot_v = [round2(sum(fmt_num(r[3 + i]) for r in subv)) for i in range(5)]
-    out.append(["%s (ID %s)" % (gname, gid), "К", "", *tot_q])
-    out.append(["", "С", "", *tot_v])
-    for w in WATERS_ORDER:
-        wq = [r for r in sub if r[2] == w]
-        wv = [r for r in subv if r[2] == w]
-        out.append(["     %s" % w, "К", "",
-                    *[round2(sum(fmt_num(r[3 + i]) for r in wq)) for i in range(5)]])
-        out.append(["", "С", "",
-                    *[round2(sum(fmt_num(r[3 + i]) for r in wv)) for i in range(5)]])
-    return out
+def _t3_agg(rows, pred):
+    """Сумма по годам для строк [gid,gname,wname,y1..y5], удовлетворяющих pred."""
+    res = [0.0] * 5
+    for r in rows:
+        if pred is None or pred(r):
+            for i in range(5):
+                res[i] += fmt_num(r[3 + i])
+    return [round2(x) for x in res]
 
 
 def sheet_table3(qrows, vrows):
-    header = ["Группа / воды", "Тип", "Примечание"] + [str(y) for y in YEARS]
+    """Лист Таблица 3 строго по структуре README:
+
+    ВСЕГО (сумма ID 00000002 и ID 00000003 REF_YEARBOOK_GROUP) - строки К и С
+    в том числе:
+         Морские районы - К и С
+         Внутренние районы - К и С
+    РЫБА И БЕСПОЗВОНОЧНЫЕ (группа ID 00000002 ...) - К и С
+    в том числе: ...
+    ВОДОРОСЛИ (группа ID 00000003 ...) - К и С
+    в том числе: ...
+    Каждая строка данных содержит и метку блока, и тип (К/С) — без «плавающих»
+    подписей, чтобы строки однозначно привязывались к блокам.
+    """
+    header = ["Группа / воды", "Тип данных"] + [str(y) for y in YEARS]
+    blocks = [
+        ("ВСЕГО (сумма ID 00000002 и ID 00000003 REF_YEARBOOK_GROUP)", None),
+        ("РЫБА И БЕСПОЗВОНОЧНЫЕ (группа ID 00000002 REF_YEARBOOK_GROUP)",
+         lambda r: r[0] == "00000002"),
+        ("ВОДОРОСЛИ (группа ID 00000003 REF_YEARBOOK_GROUP)",
+         lambda r: r[0] == "00000003"),
+    ]
     rows = []
-    rows += _t3_totals(qrows, vrows)
-    rows += _t3_group_rows(qrows, vrows, "00000002")
-    rows += _t3_group_rows(qrows, vrows, "00000003")
+    for label, pred in blocks:
+        rows.append([label, "К"] + _t3_agg(qrows, pred))
+        rows.append([label, "С"] + _t3_agg(vrows, pred))
+        rows.append(["в том числе:", "", None, None, None, None, None])
+        for wkey, wlabel in WATERS_LABELS:
+            wpred = (lambda p: (lambda r: r[2] == wkey and
+                                (p is None or p(r))))(pred)
+            rows.append(["     " + wlabel, "К"] + _t3_agg(qrows, wpred))
+            rows.append(["     " + wlabel, "С"] + _t3_agg(vrows, wpred))
     return header, rows
 
 
